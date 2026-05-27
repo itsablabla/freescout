@@ -11,7 +11,7 @@
 
 services:
   app:
-    image: tiredofit/freescout:${FREESCOUT_IMAGE_TAG:-latest}
+    image: nfrastack/freescout:${FREESCOUT_IMAGE_TAG:-latest}
     container_name: freescout-app
     restart: unless-stopped
     depends_on:
@@ -20,9 +20,12 @@ services:
     ports:
       - "${APP_PORT:-8080}:80"
     environment:
-      VIRTUAL_HOST: ${APP_HOST}
-      SITE_URL: ${APP_URL}
+      CONTAINER_NAME: freescout-app
+      TIMEZONE: ${TIMEZONE:-UTC}
 
+      APP_URL: ${APP_URL}
+
+      DB_TYPE: mariadb
       DB_HOST: db
       DB_PORT: "3306"
       DB_NAME: ${DB_NAME:-freescout}
@@ -32,27 +35,24 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASS: ${ADMIN_PASSWORD}
 
-      DISPLAY_ERRORS: "FALSE"
-      ENABLE_SMTP: ${ENABLE_SMTP:-TRUE}
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
-      SMTP_FROM_ADDRESS: ${SMTP_FROM_ADDRESS:-}
-      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-FreeScout}
-
-      TIMEZONE: ${TIMEZONE:-UTC}
-
-      CONTAINER_ENABLE_MONITORING: "FALSE"
+      FREESCOUT_APP_TIMEZONE: ${TIMEZONE:-UTC}
+      FREESCOUT_MAIL_DRIVER: smtp
+      FREESCOUT_MAIL_HOST: ${SMTP_HOST:-}
+      FREESCOUT_MAIL_PORT: ${SMTP_PORT:-587}
+      FREESCOUT_MAIL_USERNAME: ${SMTP_USER:-}
+      FREESCOUT_MAIL_PASSWORD: ${SMTP_PASS:-}
+      FREESCOUT_MAIL_ENCRYPTION: ${SMTP_ENCRYPTION:-tls}
+      FREESCOUT_MAIL_FROM_ADDRESS: ${SMTP_FROM_ADDRESS:-}
+      FREESCOUT_MAIL_FROM_NAME: ${SMTP_FROM_NAME:-FreeScout}
     volumes:
-      - freescout_data:/www/html
-      - freescout_logs:/www/logs
+      - freescout_data:/data
+      - freescout_logs:/logs
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost/"]
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/80"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 60s
+      start_period: 120s
 
   db:
     image: mariadb:10.11
