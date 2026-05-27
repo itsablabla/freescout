@@ -1,1 +1,78 @@
-file:///tmp/b2_freescout_compose.txt
+# FreeScout — single-VPS deployment.
+#
+# Quick start:
+#   1. cp deploy/.env.example deploy/.env
+#   2. Fill in passwords, APP_URL, mail settings.
+#   3. docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d
+#   4. Browse to APP_URL and complete the FreeScout web installer.
+#
+# Reverse proxy (Caddy / nginx / Traefik) is expected to terminate TLS and
+# forward to ${APP_PORT:-8080} on the host.
+
+services:
+  app:
+    image: nfrastack/freescout:${FREESCOUT_IMAGE_TAG:-latest}
+    container_name: freescout-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-8080}:80"
+    environment:
+      CONTAINER_NAME: freescout-app
+      TIMEZONE: ${TIMEZONE:-UTC}
+
+      APP_URL: ${APP_URL}
+
+      DB_TYPE: mariadb
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_NAME: ${DB_NAME:-freescout}
+      DB_USER: ${DB_USER:-freescout}
+      DB_PASS: ${DB_PASSWORD}
+
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASS: ${ADMIN_PASSWORD}
+
+      FREESCOUT_APP_TIMEZONE: ${TIMEZONE:-UTC}
+      FREESCOUT_MAIL_DRIVER: smtp
+      FREESCOUT_MAIL_HOST: ${SMTP_HOST:-}
+      FREESCOUT_MAIL_PORT: ${SMTP_PORT:-587}
+      FREESCOUT_MAIL_USERNAME: ${SMTP_USER:-}
+      FREESCOUT_MAIL_PASSWORD: ${SMTP_PASS:-}
+      FREESCOUT_MAIL_ENCRYPTION: ${SMTP_ENCRYPTION:-tls}
+      FREESCOUT_MAIL_FROM_ADDRESS: ${SMTP_FROM_ADDRESS:-}
+      FREESCOUT_MAIL_FROM_NAME: ${SMTP_FROM_NAME:-FreeScout}
+    volumes:
+      - freescout_data:/data
+      - freescout_logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/80"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  db:
+    image: mariadb:10.11
+    container_name: freescout-db
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-freescout}
+      MARIADB_USER: ${DB_USER:-freescout}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - freescout_db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  freescout_data:
+  freescout_logs:
+  freescout_db:
